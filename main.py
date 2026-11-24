@@ -18,6 +18,7 @@ thing to pack is not just an umbrella but low expectations.
 """
 import os
 import sys
+import tempfile
 import unicodedata
 
 LINE = (
@@ -50,10 +51,26 @@ def main() -> int:
         return 1
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = os.path.join(OUTPUT_DIR, "entry.txt")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
+    write_entry(path, text)
     print(f"wrote {len(text)} chars to {path}")
     return 0
+
+
+def write_entry(path, text):
+    """Write the entry atomically: temp file in the same directory, then
+    rename over the target, so a reader never sees a half-written file."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path),
+                               prefix=".entry-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 if __name__ == "__main__":
